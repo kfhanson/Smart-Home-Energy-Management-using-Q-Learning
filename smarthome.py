@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import random
+import matplotlib.pyplot as plt
 
 df = pd.read_csv('Homework_3_Dataset_Smart_home 1.csv')
 df['Next Time'] = df['Time'].shift(-1)
@@ -19,18 +20,20 @@ action = 2
 
 epsilon = 1.0 # exploration rate for ɛ-Greedy
 epsilon_min = 0.01
-decay = 0.999
+decay = 0.9995
+n_epoch = 10000
+penalty = 2.0 #user comfort penalty
 
 q_table = np.zeros((time, user_activity, appliance_state, action))
 total_reward = []
 
-for epoch in range(1000):
+for epoch in range(n_epoch):
     current_appliance_state = random.choice([0, 1])
     epoch_reward = 0
     for index, row in df.iterrows():
         current_time = int(row['Time'])
         current_user_activity = int(row['User Activity'])
-        state = (current_appliance_state, current_user_activity, current_appliance_state)
+        state = (current_time, current_user_activity, current_appliance_state)
         state_idx = state
         if random.uniform(0, 1) < epsilon:
             action = random.choice([0, 1])
@@ -47,7 +50,7 @@ for epoch in range(1000):
         if next_appliance_state == 1:
             reward = -next_electricity_price
         elif next_appliance_state == 0 and next_user_activity == 1:
-            reward = -0.5 #comfort penalty
+            reward = -penalty
         epoch_reward += reward
         old_value = q_table[state_idx + (action,)]
         next_max_q = np.max(q_table[next_state_idx])
@@ -58,8 +61,8 @@ for epoch in range(1000):
     if epsilon > epsilon_min:
         epsilon *= decay
     total_reward.append(epoch_reward)
-    if (epoch + 1) % 100 == 0:
-        print(f"Epoch {epoch + 1}/1000, Reward: {epoch_reward:.2f}, Eps: {epsilon:.3f}")
+    if (epoch + 1) % 1000 == 0:
+        print(f"Epoch {epoch + 1}/{n_epoch}, Reward: {epoch_reward:.2f}, Eps: {epsilon:.3f}")
 
 for user_act in [0, 1]:
     for app_state in [0, 1]:
@@ -101,7 +104,6 @@ print(f"  Total Electricity Cost: ${total_cost:.2f}")
 print(f"  Number of Comfort Violations (Appliance OFF when User Active): {comfort_violations}")
 print(f"  Total Reward (during evaluation): {cumulative_reward:.2f}")
 
-import matplotlib.pyplot as plt
 plt.figure(figsize=(10, 5))
 plt.plot(total_reward)
 plt.title('Total Reward per Epoch during Training')
@@ -109,7 +111,7 @@ plt.xlabel('Epoch')
 plt.ylabel('Total Reward')
 plt.grid(True)
 if len(total_reward) >= 50:
-    moving_avg = pd.Series(total_reward).rolling(50).mean()
-    plt.plot(moving_avg, label='50-Epoch Moving Avg', color='red', linewidth=2)
+    moving_avg = pd.Series(total_reward).rolling(100).mean()
+    plt.plot(moving_avg, label='100-Epoch Moving Avg', color='red', linewidth=2)
     plt.legend()
 plt.show()
