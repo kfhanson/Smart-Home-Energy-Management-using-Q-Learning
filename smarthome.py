@@ -60,3 +60,56 @@ for epoch in range(1000):
     total_reward.append(epoch_reward)
     if (epoch + 1) % 100 == 0:
         print(f"Epoch {epoch + 1}/1000, Reward: {epoch_reward:.2f}, Eps: {epsilon:.3f}")
+
+for user_act in [0, 1]:
+    for app_state in [0, 1]:
+        state_idx = (12, user_act, app_state)
+        action = np.argmax(q_table[state_idx])
+        print(f" State (T=12, User={user_act}, Appliance={app_state}): Recommended action = {action} (Q-vals: {q_table[state_idx].round(3)})")
+
+total_cost = 0
+comfort_violations = 0
+agent_schedule = []
+current_appliance_state = 0
+cumulative_reward = 0
+
+for index, row in df.iterrows():
+    current_time = int(row['Time'])
+    current_user_activity = int(row['User Activity'])
+    current_price = row['Electricity Price']
+    next_user_activity = int(row['Next User Activity'])
+    next_price = row['Next Electricity Price']
+    state_idx = (current_time, current_user_activity, current_appliance_state)
+    action = np.argmax(q_table[state_idx])
+    agent_schedule.append(action)
+    next_appliance_state_actual = action
+    if next_appliance_state_actual == 1:
+        cost_incurred = next_price
+        total_cost += cost_incurred
+        reward = -cost_incurred
+    else:
+        reward = 0
+        if next_user_activity == 1:
+            comfort_violations += 1
+            reward = -0.5
+    
+    cumulative_reward += reward
+    current_appliance_state = next_appliance_state_actual
+
+# Evaluation
+print(f"  Total Electricity Cost: ${total_cost:.2f}")
+print(f"  Number of Comfort Violations (Appliance OFF when User Active): {comfort_violations}")
+print(f"  Total Reward (during evaluation): {cumulative_reward:.2f}")
+
+import matplotlib.pyplot as plt
+plt.figure(figsize=(10, 5))
+plt.plot(total_reward)
+plt.title('Total Reward per Epoch during Training')
+plt.xlabel('Epoch')
+plt.ylabel('Total Reward')
+plt.grid(True)
+if len(total_reward) >= 50:
+    moving_avg = pd.Series(total_reward).rolling(50).mean()
+    plt.plot(moving_avg, label='50-Epoch Moving Avg', color='red', linewidth=2)
+    plt.legend()
+plt.show()
